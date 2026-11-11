@@ -31,6 +31,7 @@ def add(
 ):
     var i = thread_idx.x
     # FILL ME IN (roughly 1 line)
+    output[unsafe_offset=i] = a[unsafe_offset=i] + b[unsafe_offset=i]
 
 
 # ANCHOR_END: add
