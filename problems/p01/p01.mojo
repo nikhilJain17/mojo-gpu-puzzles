@@ -30,7 +30,7 @@ def add_10(
 ):
     var i = thread_idx.x
     # FILL ME IN (roughly 1 line)
-    output[i] = a[i] + 10
+    output[unsafe_offset=i] = a[unsafe_offset=i] + 10
 
 
 # ANCHOR_END: add_10
