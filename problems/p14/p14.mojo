@@ -14,7 +14,7 @@ from max.gpu import thread_idx, block_idx, block_dim
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from layout import TileTensor, TensorEngine
-from layout.layout import row_major
+from layout import row_major
 from layout.tile_tensor import stack_allocation
 from std.sys import argv
 from std.math import ceildiv, log2
@@ -45,7 +45,21 @@ def prefix_sum_simple[
     var global_i = block_dim.x * block_idx.x + thread_idx.x
     var local_i = thread_idx.x
     # FILL ME IN (roughly 18 lines)
-
+    # Do cooperative load into shared memory
+    # Loop and double offset
+    # Write output
+    var shared = stack_allocation[dtype=dtype, address_space=.SHARED](
+        row_major[TPB]()
+    )
+    if global_i < size:
+        shared[local_i] = rebind[Scalar[dtype]](a[global_i])
+    var offset = 1
+    while offset <= size // 2:
+        var prev_index = local_i - offset
+        if prev_index >= 0:
+            shared[local_i] += shared[prev_index]
+        offset *= 2
+    output[global_i] = shared[local_i]
 
 # ANCHOR_END: prefix_sum_simple
 
