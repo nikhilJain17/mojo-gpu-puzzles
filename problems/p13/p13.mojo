@@ -63,16 +63,14 @@ def conv_1d_simple[
         shared_conv[local_i] = rebind[Scalar[dtype]](b[global_i])
     barrier()
 
-    # print
-
-    if local_i < SIZE:
+    if global_i < SIZE:
         output[global_i] = 0
-        for i in range(CONV):
+        comptime for i in range(CONV):
             if local_i + i < SIZE:
                 output[global_i] += shared_input[local_i + i] * shared_conv[i]
 
 # ANCHOR_END: conv_1d_simple
-
+comptime TBP = 8
 comptime SIZE_2 = 15
 comptime CONV_2 = 4
 comptime BLOCKS_PER_GRID_2 = (2, 1)
@@ -98,6 +96,38 @@ def conv_1d_block_boundary[
     var global_i = block_dim.x * block_idx.x + thread_idx.x
     var local_i = thread_idx.x
     # FILL ME IN (roughly 18 lines)
+    # We might have a workgroup size < input size, such that elements spill over wgs.
+    # In this case, the last thread in a wg must yank 2 values from the next wg. 
+    var shared_input = stack_allocation[dtype=dtype, address_space=.SHARED](
+        row_major[TBP + CONV_2 - 1]()
+    )
+    var shared_conv = stack_allocation[dtype=dtype, address_space=.SHARED](
+        row_major[CONV_2]()
+    )
+
+    # Cooperative load of input
+    if global_i < SIZE_2: 
+        shared_input[local_i] = rebind[Scalar[dtype]](a[global_i])
+    # Load the extra values from the next wg into shared memory
+    if local_i == TBP - 1:
+        for i in range(CONV_2):
+            if global_i + i < SIZE_2:
+                shared_input[local_i + i] = rebind[Scalar[dtype]](a[global_i + i])
+
+    # Cooperative load of conv
+    if local_i < CONV_2:
+        shared_conv[local_i] = rebind[Scalar[dtype]](b[local_i])
+    barrier()
+
+    if global_i < SIZE_2:
+        var local_sum: output.ElementType = 0
+        comptime for i in range(CONV_2):
+            if local_i + i <= TPB + CONV_2 - 1:
+                local_sum += shared_input[local_i + i] * shared_conv[i]
+        output[global_i] = local_sum
+
+
+
 
 
 # ANCHOR_END: conv_1d_block_boundary
