@@ -14,7 +14,7 @@ from max.gpu import thread_idx, block_idx, block_dim
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from layout import TileTensor, TensorEngine
-from layout.layout import row_major
+from layout import row_major
 from layout.tile_tensor import stack_allocation
 from std.testing import assert_equal
 
@@ -60,6 +60,8 @@ def add_10_shared_tile_tensor[
     barrier()
 
     # FILL ME IN (roughly 2 lines)
+    if 0 <= global_i < size:
+        output[global_i] = shared[local_i] + 10
 
 
 # ANCHOR_END: add_10_shared

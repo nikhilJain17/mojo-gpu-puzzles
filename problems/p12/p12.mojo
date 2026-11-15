@@ -14,15 +14,15 @@ from max.gpu import thread_idx, block_idx, block_dim
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from layout import TileTensor, TensorEngine
-from layout.layout import row_major
+from layout import row_major
 from layout.tile_tensor import stack_allocation
 from std.testing import assert_equal
 
 from harness.canary import PuzzleMemory
 
 # ANCHOR: dot_product
-comptime TPB = 8
-comptime SIZE = 8
+comptime TPB = 9
+comptime SIZE = 9
 comptime BLOCKS_PER_GRID = (1, 1)
 comptime THREADS_PER_BLOCK = (TPB, 1)
 comptime dtype = DType.float32
@@ -42,8 +42,32 @@ def dot_product[
 ) where (Engine.element_size == 1):
     var size = Int(size_dev)
     # FILL ME IN (roughly 13 lines)
-    ...
+    # Calculate ai+bi
+    # Load [a0+b1, a1+b1, a2+b2, ...] into shared memory
+    # Do parallel reduction
+    var shared = stack_allocation[dtype=dtype, address_space=.SHARED](
+        row_major[TPB]()
+    )
+    var global_i = block_idx.x * block_dim.x + thread_idx.x
+    var local_i = thread_idx.x
+    if 0 <= global_i < size and 0 <= local_i < size:
+        shared[local_i] = rebind[Scalar[dtype]](a[global_i] * b[global_i])
+    barrier()
+    
+    var curr_size = size
+    while curr_size > 1:
+        var next_size = (curr_size + 1) // 2
+        if local_i < curr_size // 2:
+            shared[local_i] += shared[local_i + next_size]
+        barrier()
+        curr_size = next_size
 
+    if global_i == 0:
+        output[0] = shared[0]
+
+    barrier()
+    if global_i == 0:
+        output[0] = shared[0]
 
 # ANCHOR_END: dot_product
 

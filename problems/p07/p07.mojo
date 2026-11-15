@@ -13,7 +13,7 @@
 from max.gpu import thread_idx, block_idx, block_dim
 from max.gpu.host import DeviceContext
 from layout import TileTensor, TensorEngine
-from layout.layout import row_major
+from layout import row_major
 from std.testing import assert_equal
 
 from harness.canary import PuzzleMemory
@@ -40,6 +40,8 @@ def add_10_blocks_2d[
     var row = block_dim.y * block_idx.y + thread_idx.y
     var col = block_dim.x * block_idx.x + thread_idx.x
     # FILL ME IN (roughly 2 lines)
+    if 0 <= row < size and 0 <= col < size:
+        output[row, col] = a[row, col] + 10
 
 
 # ANCHOR_END: add_10_blocks_2d

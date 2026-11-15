@@ -14,7 +14,7 @@ from max.gpu import thread_idx, block_idx, block_dim
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from layout import TileTensor, TensorEngine
-from layout.layout import row_major
+from layout import row_major
 from layout.tile_tensor import stack_allocation
 from std.sys import argv
 from std.testing import assert_equal
@@ -46,7 +46,30 @@ def conv_1d_simple[
     var global_i = block_dim.x * block_idx.x + thread_idx.x
     var local_i = thread_idx.x
     # FILL ME IN (roughly 14 lines)
+    
+    # 1. Load input and conv into shared memory
+    # 2. One thread per output element
+    #     -> Each thread computes one output element 
+    
+    var shared_input = stack_allocation[dtype=dtype, address_space=.SHARED](
+        row_major[TPB]()
+    )
+    var shared_conv = stack_allocation[dtype=dtype, address_space=.SHARED](
+        row_major[CONV]()
+    )
+    if local_i < SIZE:
+        shared_input[local_i] = rebind[Scalar[dtype]](a[global_i])
+    if local_i < CONV:
+        shared_conv[local_i] = rebind[Scalar[dtype]](b[global_i])
+    barrier()
 
+    # print
+
+    if local_i < SIZE:
+        output[global_i] = 0
+        for i in range(CONV):
+            if local_i + i < SIZE:
+                output[global_i] += shared_input[local_i + i] * shared_conv[i]
 
 # ANCHOR_END: conv_1d_simple
 

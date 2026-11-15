@@ -14,7 +14,7 @@ from max.gpu import thread_idx, block_idx, block_dim
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from layout import TileTensor, TensorEngine
-from layout.layout import row_major
+from layout import row_major
 from layout.tile_tensor import stack_allocation
 from std.testing import assert_equal
 
@@ -48,7 +48,23 @@ def pooling[
     var global_i = block_dim.x * block_idx.x + thread_idx.x
     var local_i = thread_idx.x
     # FILL ME IN (roughly 10 lines)
-
+    # We need to sum the previous 3 values into the current memory slot
+    # NOTE: this code does NOT support cross-block values!
+    # i.e. it assumes only one block 
+    var prev_indices = [
+        min(
+            max(0, local_i-2), 
+            size), 
+        min(
+            max(0, local_i-1), 
+            size), 
+        min(
+            max(0, local_i-0), 
+            size)
+    ]
+    output[global_i] = 0
+    for index in prev_indices:
+        output[global_i] += a[index]
 
 # ANCHOR_END: pooling
 
