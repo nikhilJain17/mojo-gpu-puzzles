@@ -53,12 +53,24 @@ def prefix_sum_simple[
     )
     if global_i < size:
         shared[local_i] = rebind[Scalar[dtype]](a[global_i])
+    
+    # Write all values to shared memory before reading them
+    barrier()
+    
     var offset = 1
-    while offset <= size // 2:
+    while offset <= TPB // 2:
         var prev_index = local_i - offset
         if prev_index >= 0:
-            shared[local_i] += shared[prev_index]
+            # Stop until every thread has read the necessary value,
+            # and only then do we proceed to write
+            var tmp = shared[prev_index]
+            barrier()
+            # Stop until every thread has written what they want,
+            # and only then do we proceed to read for next iter.
+            shared[local_i] += tmp
+            barrier()
         offset *= 2
+        barrier()
     output[global_i] = shared[local_i]
 
 # ANCHOR_END: prefix_sum_simple
@@ -89,6 +101,34 @@ def prefix_sum_local_phase[
     var global_i = block_dim.x * block_idx.x + thread_idx.x
     var local_i = thread_idx.x
     # FILL ME IN (roughly 20 lines)
+    # Basically the same as simple
+    var shared = stack_allocation[dtype=dtype, address_space=.SHARED](
+        row_major[TPB]()
+    )
+    if global_i < size:
+        shared[local_i] = rebind[Scalar[dtype]](a[global_i])
+
+    barrier()
+
+    var offset = 1
+    while offset <= TPB // 2:
+        var prev_index = local_i - offset
+        if prev_index >= 0:
+            # Stop until every thread has read the necessary value,
+            # and only then do we proceed to write
+            var tmp = shared[prev_index]
+            barrier()
+            # Stop until every thread has written what they want,
+            # and only then do we proceed to read for next iter.
+            shared[local_i] += tmp
+            barrier()
+        offset *= 2
+        barrier()
+
+    if global_i < size:
+        output[global_i] = shared[local_i]
+    else:
+        output[global_i] = 0
 
 
 # Kernel 2: Add block sums to their respective blocks
@@ -103,7 +143,13 @@ def prefix_sum_block_sum_phase[
     var size = Int(size_dev)
     var global_i = block_dim.x * block_idx.x + thread_idx.x
     # FILL ME IN (roughly 3 lines)
-
+    # We see elements at output[k*TBG] and broadcast them downstream
+    # Each thread i is responsible for the ith index
+    if global_i < size:
+        var prev_offset = ((global_i) // TPB) * TPB - 1
+        while prev_offset >= 0:
+            output[global_i] += output[prev_offset]
+            prev_offset -= TPB 
 
 # ANCHOR_END: prefix_sum_complete
 
