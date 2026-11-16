@@ -14,9 +14,10 @@ from max.gpu import thread_idx, block_idx, block_dim
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from layout import TileTensor, TensorEngine
-from layout.layout import row_major
+from layout import row_major
 from layout.tile_tensor import stack_allocation
 from std.testing import assert_equal
+from std.bit import log2_floor
 
 from harness.canary import PuzzleMemory
 
@@ -45,6 +46,32 @@ def axis_sum[
     var local_i = thread_idx.x
     var batch = block_idx.y
     # FILL ME IN (roughly 15 lines)
+    # Load to shared memory
+    var shm = stack_allocation[dtype=dtype, address_space=.SHARED](
+        row_major[TPB]()
+    )
+    if local_i < SIZE:
+        shm[local_i] = rebind[Scalar[dtype]](a[batch, local_i])
+    else:
+        shm[local_i] = 0
+
+    barrier()
+    # if local_i == 0:
+    #     print("Block", block_idx.y, "\nshm\n", shm)
+
+    # Each block computes a partial sum along an axis
+    # Start at the largest power of two < TPB
+    comptime initial_stride = 1 << log2_floor(TPB - 1)
+    var stride = initial_stride
+    while stride > 0:
+        if local_i < stride and local_i + stride < TPB:
+            shm[local_i] += shm[local_i + stride]
+        stride //= 2
+        barrier()
+    
+    if local_i == 0:
+        output[batch, 0] = shm[0]
+        print("\nBlock", block_idx.y, "shm", shm, "sum", shm[0])
 
 
 # ANCHOR_END: axis_sum
