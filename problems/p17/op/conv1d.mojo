@@ -15,7 +15,7 @@ from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from layout import Coord, TileTensor
 from layout.tensor_engine import TensorEngine
-from layout.layout import row_major, TensorLayout
+from layout import row_major, TensorLayout
 from layout.tile_tensor import stack_allocation
 from std.sys import argv
 from std.testing import assert_equal
@@ -137,6 +137,21 @@ struct Conv1DCustomOp:
             )
 
             # FILL ME IN with 2 lines calling our conv1d_kernel
+            comptime kernel = conv1d_kernel[
+                input_size,
+                conv_size,
+                output_tensor.LayoutType,
+                input_tensor.LayoutType,
+                kernel_tensor.LayoutType,
+                output_tensor.Engine,
+            ]
+            gpu_ctx.enqueue_function[kernel](
+                output_tensor,
+                input_tensor,
+                kernel_tensor,
+                grid_dim=BLOCKS_PER_GRID,
+                block_dim=(TPB,1)
+            )
 
         elif ctx.target.is_cpu():
             # we can fallback to CPU
