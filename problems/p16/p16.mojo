@@ -14,7 +14,7 @@ from max.gpu import thread_idx, block_idx, block_dim
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from layout import TileTensor, TensorEngine
-from layout.layout import row_major
+from layout import row_major
 from layout.tile_tensor import stack_allocation
 from std.sys import argv
 from std.testing import assert_equal
@@ -44,6 +44,12 @@ def naive_matmul[
     var row = block_dim.y * block_idx.y + thread_idx.y
     var col = block_dim.x * block_idx.x + thread_idx.x
     # FILL ME IN (roughly 6 lines)
+    if row >= SIZE or col >= SIZE:
+        return
+    var acc: output.ElementType = 0
+    comptime for i in range(0, SIZE):
+        acc += a[row, i] * b[i, col]
+    output[row, col] = acc
 
 
 # ANCHOR_END: naive_matmul
