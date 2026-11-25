@@ -71,6 +71,26 @@ def single_block_matmul[
     var local_row = thread_idx.y
     var local_col = thread_idx.x
     # FILL ME IN (roughly 12 lines)
+    # Load matrices into shared memory, then matmul
+    var shared_a = stack_allocation[dtype=dtype, address_space=.SHARED](
+        row_major[SIZE, SIZE]()
+    )
+    var shared_b = stack_allocation[dtype=dtype, address_space=.SHARED](
+        row_major[SIZE, SIZE]()
+    )
+    if row < SIZE and col < SIZE:
+        shared_a[row, col] = rebind[Scalar[dtype]](a[row, col])
+        shared_b[row, col] = rebind[Scalar[dtype]](b[row, col])
+    
+    barrier()
+
+    if row >= SIZE or col >= SIZE:
+        return
+    var acc: output.ElementType = 0
+    comptime for i in range(0, SIZE):
+        acc += shared_a[row, i] * shared_b[i, col]
+    output[row, col] = acc
+ 
 
 
 # ANCHOR_END: single_block_matmul
