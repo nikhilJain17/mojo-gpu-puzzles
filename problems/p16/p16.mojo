@@ -123,6 +123,32 @@ def matmul_tiled[
     var tiled_row = block_idx.y * TPB + local_row
     var tiled_col = block_idx.x * TPB + local_col
     # FILL ME IN (roughly 20 lines)
+    # We need to load SIZE*2 tiles in shm
+    var acc: output.ElementType = 0
+    comptime for tile in range(size // TPB):
+        var shared_a_tile = stack_allocation[dtype=dtype, address_space=.SHARED](
+            layout_tiled
+        )
+        var shared_b_tile = stack_allocation[dtype=dtype, address_space=.SHARED](
+            layout_tiled
+        )
+        if local_row < TPB and local_col < TPB:
+            shared_a_tile[local_row, local_col] = rebind[Scalar[dtype]](
+                a[
+                    tiled_row, 
+                    (TPB * tile) + local_col
+                ]
+            )
+            shared_b_tile[local_row, local_col] = rebind[Scalar[dtype]](
+                b[
+                    (TPB * tile) + local_row,
+                    tiled_col
+                 ]
+            )
+        barrier()
+        comptime for k in range(size // TPB):
+            acc += shared_a_tile[local_row, k] * shared_b_tile[k, local_col]
+    output[tiled_row, tiled_col] = acc
 
 
 # ANCHOR_END: matmul_tiled
